@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"partialupdate/internal/models"
 	"strconv"
+	"strings"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
@@ -275,47 +276,100 @@ func showFullUpdateForm() {
 // ---------------------------------------------------------------------
 
 func showPatchForm() {
+	// -----------------------------------------------------------------
+	// 1️⃣ Form fields
+	// -----------------------------------------------------------------
+	var (
+		idInput   *tview.InputField
+		nameInput *tview.InputField
+		ageInput  *tview.InputField
+		aliveDD   *tview.DropDown
+	)
+
 	form := tview.NewForm()
-	form.AddInputField("ID", "", 20, nil, nil).
-		AddInputField("Name (optional)", "", 30, nil, nil).
-		AddCheckbox("Alive (optional)", false, nil).
-		AddInputField("Age (optional)", "", 5, func(textToCheck string, lastChar rune) bool {
-			if textToCheck == "" {
-				return true // allow empty field → means “not set”
-			}
-			_, err := strconv.Atoi(textToCheck)
-			return err == nil
-		}, nil).
-		AddButton("Patch", func() {
-			id := form.GetFormItemByLabel("ID (path param)").(*tview.InputField).GetText()
-			name := form.GetFormItemByLabel("Name (optional)").(*tview.InputField).GetText()
-			aliveChecked := form.GetFormItemByLabel("Alive (optional)").(*tview.Checkbox).IsChecked()
-			ageStr := form.GetFormItemByLabel("Age (optional)").(*tview.InputField).GetText()
 
-			// Build a partial payload – omit zero‑value fields so the server can ignore them.
-			patch := models.Person{}
-			if name != "" {
-				patch.Name = name
-			}
-			if ageStr != "" {
-				age, _ := strconv.Atoi(ageStr)
-				patch.Age = age
-			}
-			// We can't differentiate “checkbox left unchecked because I don’t want to change” from “I want to set false”.
-			// For this demo we always send the boolean value; real life would need a tri‑state (nil/true/false) design.
-			patch.Alive = aliveChecked
+	// ID – required for the URL, not part of the patch payload
+	idInput = tview.NewInputField().
+		SetLabel("ID (path param)").
+		SetFieldWidth(20)
+	form.AddFormItem(idInput)
 
-			url := fmt.Sprintf("http://localhost:8080/v1/person/%s", id)
-			status, body, err := doRequest(http.MethodPatch, url, patch)
-			if err != nil {
-				showResult(app, "Patch – error", 0, err.Error())
+	// Name – optional string
+	nameInput = tview.NewInputField().
+		SetLabel("Name (optional)").
+		SetFieldWidth(30)
+	form.AddFormItem(nameInput)
+
+	// Age – optional int
+	ageInput = tview.NewInputField().
+		SetLabel("Age (optional)").
+		SetFieldWidth(5).
+		SetAcceptanceFunc(tview.InputFieldInteger)
+	form.AddFormItem(ageInput)
+
+	// Alive – tri‑state drop‑down
+	aliveDD = tview.NewDropDown().
+		SetLabel("Alive (optional)").
+		SetOptions([]string{"— unchanged —", "true", "false"}, nil).
+		SetCurrentOption(0) // start on the “unchanged” entry
+	form.AddFormItem(aliveDD)
+
+	// -----------------------------------------------------------------
+	// 2️⃣ Buttons
+	// -----------------------------------------------------------------
+	form.AddButton("Patch", func() {
+		// ------------------- collect values -------------------
+		id := idInput.GetText()
+		name := strings.TrimSpace(nameInput.GetText())
+		ageStr := strings.TrimSpace(ageInput.GetText())
+
+		// Parse optional int
+		var agePtr *int
+		if ageStr != "" {
+			if age, err := strconv.Atoi(ageStr); err == nil {
+				agePtr = &age
+			} else {
+				showResult(app, "Validation error", http.StatusBadRequest,
+					"`Age` must be a number")
 				return
 			}
-			showResult(app, fmt.Sprintf("PATCH /v1/person/%s", id), status, body)
-		}).
-		AddButton("Cancel", func() { app.SetRoot(rootFlex, true).SetFocus(menu) })
+		}
+
+		// Parse the tri‑state bool from the drop‑down
+		_, aliveStr := aliveDD.GetCurrentOption()
+		alivePtr := parseTriState(aliveStr)
+
+		// ------------------- build the PATCH payload -------------------
+		// Use a map so we can omit keys that the user didn’t touch.
+		patch := map[string]any{}
+		if name != "" {
+			patch["name"] = name
+		}
+		if agePtr != nil {
+			patch["age"] = *agePtr
+		}
+		if alivePtr != nil {
+			patch["alive"] = *alivePtr
+		}
+
+		// ------------------- send the request -------------------
+		url := fmt.Sprintf("http://localhost:8080/v1/person/%s", id)
+		status, body, err := doRequest(http.MethodPatch, url, patch)
+		if err != nil {
+			showResult(app, "Patch – request error", 0, err.Error())
+			return
+		}
+		showResult(app, fmt.Sprintf("PATCH /v1/person/%s", id), status, body)
+	})
+
+	form.AddButton("Cancel", func() {
+		app.SetRoot(rootFlex, true).SetFocus(menu)
+	})
+
+	// -----------------------------------------------------------------
+	// 3️⃣ Final UI tweaks
+	// -----------------------------------------------------------------
 	form.SetBorder(true).SetTitle("Partial Update (PATCH)")
-	// rootFlex.AddItem(form, 0, 1, true)
 	replaceRight(form)
 	app.SetFocus(form)
 }

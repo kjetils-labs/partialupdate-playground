@@ -1,0 +1,68 @@
+services:
+  # -------------------------------------------------
+  # MongoDB
+  # -------------------------------------------------
+  mongo:
+    image: ${DOCKER_MIRROR}mongo:8-noble
+    container_name: person-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017" # expose to host for local dev / curl
+    environment:
+      # (optional) enable auth – useful when you expose the DB publicly.
+      MONGO_INITDB_DATABASE: person
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: secret
+    volumes:
+      - ./hacks/data/mongo-data:/data/db # persist data
+      - ./hacks/mongo/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # -------------------------------------------------
+  # Mongo Express – a web GUI for MongoDB
+  # -------------------------------------------------
+  mongo-express:
+    image: ${DOCKER_MIRROR}mongo-express:1.0.2-20-alpine3.19
+    container_name: person-mongo-express
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "8081:8081" # http://localhost:8081
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: secret
+      ME_CONFIG_MONGODB_URL: mongodb://admin:secret@mongo:27017/
+      # Optional UI customisations
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: secret
+
+  # -------------------------------------------------
+  # OPTIONAL – Go TUI application (build & run inside Docker)
+  # -------------------------------------------------
+  # Uncomment the block if you want Docker to build and run the TUI.
+  #
+  # tui:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: person-tui
+  #   depends_on:
+  #     - mongo
+  #   environment:
+  #     # When running inside Docker we must address the DB by its *service name*.
+  #     MONGO_URI: mongodb://admin:secret@mongo:27017
+  #     MONGO_DB: demo
+  #     MONGO_COLL: people
+  #   tty: true          # keep a pseudo‑tty so the TUI works interactively
+  #   stdin_open: true   # attach your keyboard when you run `docker compose run`
+  #   # No port mapping needed – the TUI runs in the terminal, not over HTTP.
+
+volumes:
+  mongo-data:

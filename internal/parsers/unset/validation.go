@@ -3,14 +3,17 @@ package unset
 import (
 	"errors"
 	"fmt"
-	"maps"
 	"reflect"
 	"strings"
 	"sync"
 )
 
 type fieldMeta struct {
-	typ reflect.Type
+	name      string // bson field name
+	typ       reflect.Type
+	index     int // field index in struct
+	inline    bool
+	omitEmpty bool // optional (future use)
 }
 
 type typeMeta struct {
@@ -42,11 +45,21 @@ func buildTypeMeta(t reflect.Type) *typeMeta {
 		tag := f.Tag.Get("bson")
 		name, opts := parseBSONTag(tag)
 
+		// Handle inline fields
 		if opts["inline"] {
 			ft := indirectType(f.Type)
 			if ft.Kind() == reflect.Struct {
+				// Add inline fields directly to the parent struct's fields map
 				inlineMeta := getTypeMeta(ft)
-				maps.Copy(fields, inlineMeta.fields)
+				for fieldName, field := range inlineMeta.fields {
+					// Flatten inline field by using the parent name without "inline."
+					fields[fieldName] = fieldMeta{
+						name:   fieldName, // No "inline." prefix
+						typ:    field.typ,
+						index:  field.index,
+						inline: false, // We treat them as normal fields now
+					}
+				}
 			}
 			continue
 		}
@@ -56,13 +69,18 @@ func buildTypeMeta(t reflect.Type) *typeMeta {
 		}
 
 		fields[name] = fieldMeta{
-			typ: f.Type,
+			name:   name,
+			typ:    f.Type,
+			index:  i,
+			inline: opts["inline"],
 		}
 	}
 
 	return &typeMeta{fields: fields}
 }
 
+// validateUnsetMask ensures all provided paths exist in the resource type.
+// Supports nested structs and inline fields.
 func validateUnsetMask(resource any, paths []string) error {
 	if len(paths) == 0 || resource == nil {
 		return nil
@@ -120,30 +138,6 @@ func validatePath(t reflect.Type, path string) error {
 				return fmt.Errorf("field '%s' is not a struct", part)
 			}
 			current = ft
-		}
-	}
-
-	return nil
-}
-
-func validateUnsetMaskCached(resource any, paths []string) error {
-	if len(paths) == 0 || resource == nil {
-		return nil
-	}
-
-	t := indirectType(reflect.TypeOf(resource))
-
-	if t.Kind() != reflect.Struct {
-		return errors.New("unsetMask validation requires struct resource")
-	}
-
-	for _, path := range paths {
-		if path == "" {
-			return fmt.Errorf("invalid empty path")
-		}
-
-		if err := validatePathCached(t, path); err != nil {
-			return fmt.Errorf("invalid path '%s': %w", path, err)
 		}
 	}
 

@@ -1,6 +1,7 @@
 package unset_test
 
 import (
+	"errors"
 	"partialupdate/internal/models"
 	"partialupdate/internal/parsers/unset"
 	"reflect"
@@ -48,9 +49,7 @@ func TestParsePersonRemoveZeroValuesNested(t *testing.T) {
 
 	expected := bson.M{
 		"$set": bson.M{
-			"personResource": bson.M{
-				"_id": "123",
-			},
+			"personResource.id": "123",
 		},
 	}
 
@@ -90,14 +89,10 @@ func TestParsePersonUnsetMaskNested(t *testing.T) {
 
 	expected := bson.M{
 		"$set": bson.M{
-			"personResource": bson.M{
-				"_id":   "123",
-				"alive": true,
-				"age":   30,
-				"personData": bson.M{
-					"personalNumber": 12345,
-				},
-			},
+			"personResource.id":                        "123",
+			"personResource.age":                       30,
+			"personResource.alive":                     true,
+			"personResource.personData.personalNumber": 12345,
 		},
 		"$unset": bson.M{
 			"personResource.name":                 "",
@@ -130,16 +125,32 @@ func TestParsePersonPartialUpdateNested(t *testing.T) {
 
 	expected := bson.M{
 		"$set": bson.M{
-			"personResource": bson.M{
-				"_id": "123",
-				"personData": bson.M{
-					"personalNumber": 67890,
-				},
-			},
+			"personResource.id":                        "123",
+			"personResource.personData.personalNumber": 67890,
 		},
 	}
 
 	if !reflect.DeepEqual(normalize(result), normalize(expected)) {
 		t.Errorf("expected %+v, got %+v", normalize(expected), normalize(result))
+	}
+}
+
+func TestParseIgnoresIDUpdate(t *testing.T) {
+	req := unset.Request{
+		Resource: &models.Resource{
+			ID: "new-id",
+		},
+	}
+
+	result, err := req.Parse()
+	if err != nil {
+		if errors.Is(err, unset.ErrNoValidFields) {
+			return
+		}
+		t.Fatal(err)
+	}
+
+	if len(result) != 0 {
+		t.Errorf("expected no update when only _id is provided, got %+v", result)
 	}
 }

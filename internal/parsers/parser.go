@@ -3,7 +3,6 @@ package parsers
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"reflect"
 	"slices"
 
@@ -97,7 +96,6 @@ func parse(operations []Operation, update *MongoUpdate) error {
 		if err != nil {
 			return fmt.Errorf("path error in op %q: %w", operation.Op, err)
 		}
-		slog.Info("converted path", "original_path", operation.Path, "path", path)
 
 		switch operation.Op {
 		case OperationTypeAdd:

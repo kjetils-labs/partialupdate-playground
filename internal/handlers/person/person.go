@@ -6,17 +6,16 @@ import (
 	"net/http"
 	"partialupdate/internal/database"
 	"partialupdate/internal/models"
-	"partialupdate/internal/parsers/grpc"
 
 	"github.com/go-chi/chi/v5"
 )
 
 func CreatePerson(store *database.PersonStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var p models.Person
+		var p models.Resource
 		err := json.NewDecoder(r.Body).Decode(&p)
 		if err != nil {
-			http.Error(w, "failed to decode body", http.StatusBadRequest)
+			http.Error(w, "failed to decode body. "+err.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -60,17 +59,11 @@ func GetPerson(store *database.PersonStore) http.HandlerFunc {
 func UpdatePerson(store *database.PersonStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
-		var p models.Person
+		var p models.Resource
 		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 			http.Error(w, "invalid JSON payload", http.StatusBadRequest)
 			return
 		}
-		// Enforce that the URL id and payload id match (or you could ignore payload.id)
-		if p.ID != "" && p.ID != id {
-			http.Error(w, "payload id does not match URL id", http.StatusBadRequest)
-			return
-		}
-		p.ID = id // make sure the stored record keeps the correct id
 
 		if updated, err := store.Update(id, p); !updated {
 			http.Error(w, "person not found. "+err.Error(), http.StatusNotFound)
@@ -81,36 +74,38 @@ func UpdatePerson(store *database.PersonStore) http.HandlerFunc {
 }
 
 // ---------------------------------------------------------------------
-// PartialUpdate (PATCH) – empty stub
+// PartialUpdate (PATCH)
 // ---------------------------------------------------------------------
-
-// PatchPerson (a.k.a. PartialUpdate) currently does nothing.
-// The signature mirrors the other handlers so you can drop in real logic later.
-func PatchPersonGRPC(store *database.PersonStore) http.HandlerFunc {
+func PatchPerson(store *database.PersonStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var p grpc.Request
-		err := json.NewDecoder(r.Body).Decode(&p)
-		if err != nil {
-			http.Error(w, "failed to decode body", http.StatusBadRequest)
-			return
-		}
+		http.Error(w, "not implemented", http.StatusInternalServerError)
+		// err := json.NewDecoder(r.Body).Decode(&p)
+		// if err != nil {
+		// 	http.Error(w, "failed to decode body", http.StatusBadRequest)
+		// 	return
+		// }
+		// _ = chi.URLParam(r, "id")
 
-		// TODO: implement field‑wise merge (e.g. only change Name if present)
-		// For now we simply return “Not Implemented”.
-		http.Error(w, "partial update not implemented yet", http.StatusNotImplemented)
-	}
-}
+		// status, err := store.Patch(id, p)
+		// if err != nil {
+		// 	switch {
+		// 	case errors.Is(err, unset.ErrNoValidFields):
+		// 		http.Error(w, err.Error(), http.StatusBadRequest)
+		// 		return
+		// 	case errors.Is(err, unset.ErrNoResourceInRequest):
+		// 		http.Error(w, err.Error(), http.StatusBadRequest)
+		// 		return
+		// 	}
+		// 	http.Error(w, "failed to decode body", http.StatusInternalServerError)
+		// 	return
+		// }
+		//
+		// if status {
+		// 	w.WriteHeader(http.StatusAccepted)
+		// 	return
+		// }
 
-func PatchPersonPointer(store *database.PersonStore) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var p models.PersonPatch
-		err := json.NewDecoder(r.Body).Decode(&p)
-		if err != nil {
-			http.Error(w, "failed to decode body", http.StatusBadRequest)
-			return
-		}
-
-		http.Error(w, "partial update not implemented yet", http.StatusNotImplemented)
+		// w.WriteHeader(http.StatusInternalServerError)
 	}
 }
 
@@ -118,7 +113,11 @@ func DeletePerson(store *database.PersonStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
 		if deleted, err := store.Delete(id); !deleted {
-			http.Error(w, "person not found. "+err.Error(), http.StatusNotFound)
+			if err != nil {
+				http.Error(w, "person not found. "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			http.Error(w, "person not found", http.StatusNotFound)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)

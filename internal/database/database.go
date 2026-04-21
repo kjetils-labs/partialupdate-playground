@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"partialupdate/internal/models"
 	"reflect"
@@ -33,7 +34,7 @@ func NewMongoStore(uri, dbName, collName string) (*PersonStore, error) {
 	clientOpts := options.Client().ApplyURI(uri)
 	client, err := mongo.Connect(ctx, clientOpts)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to mongodb at address %v. %w", uri, err)
 	}
 
 	// Ping to verify the connection works
@@ -48,7 +49,7 @@ func NewMongoStore(uri, dbName, collName string) (*PersonStore, error) {
 }
 
 // ---------- Create ----------
-func (s *PersonStore) Create(p *models.Person) error {
+func (s *PersonStore) Create(p *models.Resource) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -60,10 +61,10 @@ func (s *PersonStore) Create(p *models.Person) error {
 }
 
 // ---------- Get ----------
-func (s *PersonStore) Get(id string) (models.Person, bool, error) {
+func (s *PersonStore) Get(id string) (models.Resource, bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	var p models.Person
+	var p models.Resource
 	err := s.coll.FindOne(ctx, bson.M{"_id": id}).Decode(&p)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
@@ -75,7 +76,7 @@ func (s *PersonStore) Get(id string) (models.Person, bool, error) {
 }
 
 // ---------- List ----------
-func (s *PersonStore) List() ([]models.Person, error) {
+func (s *PersonStore) List() ([]models.Resource, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	cur, err := s.coll.Find(ctx, bson.D{})
@@ -84,9 +85,9 @@ func (s *PersonStore) List() ([]models.Person, error) {
 	}
 	defer cur.Close(ctx)
 
-	var out []models.Person
+	var out []models.Resource
 	for cur.Next(ctx) {
-		var p models.Person
+		var p models.Resource
 		if err = cur.Decode(&p); err != nil {
 			return nil, err
 		}
@@ -99,7 +100,7 @@ func (s *PersonStore) List() ([]models.Person, error) {
 }
 
 // ---------- Update (full replace) ----------
-func (s *PersonStore) Update(id string, p models.Person) (bool, error) {
+func (s *PersonStore) Update(id string, p models.Resource) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	// Ensure the document's _id stays the same regardless of what the caller sent.
@@ -112,44 +113,27 @@ func (s *PersonStore) Update(id string, p models.Person) (bool, error) {
 	return res.MatchedCount > 0, nil
 }
 
-// ---------- Patch ----------
-func (s *PersonStore) Patch(id string, p models.PersonPatch) (bool, error) {
-
-	// Build the $set document: {$set: {field1: val1, field2: val2, …}}
-	updates := bson.D{}
-
-	// get the type of struct == Book
-	typeData := reflect.TypeOf(p)
-
-	// get the values from the provided object: author -> Paulo Coelho
-	values := reflect.ValueOf(p)
-
-	for i := 1; i < typeData.NumField(); i++ {
-		field := typeData.Field(i) // get the field from the struct definition
-		val := values.Field(i)     // get the value from the specified field position
-		tag := field.Tag.Get("bson")
-
-		if isZeroType(val) {
-			continue
-		}
-		update := bson.E{
-			Key:   tag,
-			Value: val.Interface(),
-		}
-		updates = append(updates, update)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	res, err := s.coll.UpdateOne(ctx,
-		bson.M{"_id": id},
-		bson.M{"$set": updates},
-	)
-	if err != nil {
-		return false, err
-	}
-	return res.MatchedCount > 0, nil
-}
+// // ---------- Patch ----------
+// func (s *PersonStore) Patch(id string, p jsonpatch.Operation) (bool, error) {
+//
+// 	update, err := p.Parse()
+// 	if err != nil {
+// 		return false, fmt.Errorf("failed to parse update. %w", err)
+// 	}
+//
+// 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// 	defer cancel()
+// 	slog.Info("data", "update", update)
+// 	filter := bson.M{"_id": id}
+// 	res, err := s.coll.UpdateOne(ctx,
+// 		filter,
+// 		update,
+// 	)
+// 	if err != nil {
+// 		return false, fmt.Errorf("failed to update record. %w", err)
+// 	}
+// 	return res.MatchedCount > 0, nil
+// }
 
 // ---------- Delete ----------
 func (s *PersonStore) Delete(id string) (bool, error) {

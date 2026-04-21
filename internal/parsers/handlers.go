@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strconv"
 	"strings"
 
@@ -44,7 +43,6 @@ func applyAdd(update *MongoUpdate, op Operation, path string) error {
 		}
 	}
 
-	slog.Info("set data", "path", path, "value", val)
 	setField(&update.Set, path, val)
 	return nil
 }
@@ -89,7 +87,6 @@ func applyReplace(update *MongoUpdate, op Operation, path string) error {
 
 func setField(m *bson.M, path string, val any) {
 
-	slog.Info("set data", "path", path, "value", val)
 	(*m)[path] = val
 }
 

@@ -18,14 +18,53 @@ type testCaseBuildPaths struct {
 func TestBuildPaths(t *testing.T) {
 	testcases := []testCaseBuildPaths{
 		{
+			TestName:           "working struct with pointer and sub structs",
+			TestStruct:         models.Resource{},
+			ExpectedPathsCount: 20,
+			ExpectedPaths: []string{
+				"ID",
+				"PersonResource.ID",
+				"PersonResource.Name",
+				"PersonResource.Alive",
+				"PersonResource.AgeInt",
+				"PersonResource.AgeInt8",
+				"PersonResource.AgeInt16",
+				"PersonResource.AgeInt32",
+				"PersonResource.AgeInt64",
+				"PersonResource.AgeUint",
+				"PersonResource.AgeUint8",
+				"PersonResource.AgeUint16",
+				"PersonResource.AgeUint32",
+				"PersonResource.AgeUint64",
+				"PersonResource.AgeFloat32",
+				"PersonResource.AgeFloat64",
+				"PersonResource.PersonData.PersonalNumber",
+				"PersonResource.PersonData.Religious",
+				"PersonResource.CheeseCakeLiker.LikesCheesecake",
+				"PersonResource.Tags",
+			},
+			ExpectedFailedPaths: []string{},
+		},
+		{
 			TestName:           "working struct with imbeds and sub structs",
 			TestStruct:         models.Person{},
-			ExpectedPathsCount: 7,
+			ExpectedPathsCount: 19,
 			ExpectedPaths: []string{
 				"ID",
 				"Name",
 				"Alive",
-				"Age",
+				"AgeInt",
+				"AgeInt8",
+				"AgeInt16",
+				"AgeInt32",
+				"AgeInt64",
+				"AgeUint",
+				"AgeUint8",
+				"AgeUint16",
+				"AgeUint32",
+				"AgeUint64",
+				"AgeFloat32",
+				"AgeFloat64",
 				"PersonData.PersonalNumber",
 				"PersonData.Religious",
 				"CheeseCakeLiker.LikesCheesecake",
@@ -54,27 +93,20 @@ func TestBuildPaths(t *testing.T) {
 		},
 	}
 
-	// Tests a bad retrieval works as expected.
-	_ = parsers.FieldMaps.Get("Fakestruct")
-
 	for _, test := range testcases {
 		_ = t.Run(test.TestName, func(t *testing.T) {
 
-			structName := reflect.TypeOf(test.TestStruct).Name()
-			err := parsers.FieldMaps.Add(test.TestStruct)
-			if err != nil {
-				t.Fatalf("failed to parse valid struct. %v", err)
-			}
-
-			fieldmap := parsers.FieldMaps.Get(structName)
-			if fieldmap.Length() != test.ExpectedPathsCount {
-				t.Fatalf("received field count %v does not match expected field count %v", fieldmap.Length(), test.ExpectedPathsCount)
+			paths := parsers.WalkStruct(test.TestStruct)
+			if len(paths) != test.ExpectedPathsCount {
+				t.Fatalf("received path count %v does not match expected path count %v", len(paths), test.ExpectedPathsCount)
 			}
 
 			invalidPaths := make([]string, 0)
 			for _, path := range test.ExpectedPaths {
-				field := fieldmap.Validate(path)
-				if field == nil {
+				for _, p := range paths {
+					if p.Path == path {
+						continue
+					}
 					invalidPaths = append(invalidPaths, path)
 				}
 

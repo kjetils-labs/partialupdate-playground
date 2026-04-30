@@ -49,7 +49,7 @@ func (o *Operation) UnmarshalJSON(b []byte) error {
 	// Validate required value for operations that need it
 	switch o.Op {
 	case OperationTypeAdd, OperationTypeReplace, OperationTypeTest:
-		if len(data.Value) == 0 {
+		if len(data.Value) == 0 || data.Value == nil {
 			return fmt.Errorf("operation %q requires 'value' field", o.Op)
 		}
 		o.Value = data.Value

@@ -4,41 +4,25 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func applyAdd(update *MongoUpdate, op Operation, path string) error {
-	// _, _, isAppend, err := parseIndex(last)
-	// switch {
-	// case errors.Is(err, errNotAppendAction):
-	// default:
-	// 	return fmt.Errorf("invalid array index '%s': %w", last, err)
-	// }
+func applyAdd(update *MongoUpdate, op Operation, field *FieldInfo, path string) error {
 
-	// Root-level path (e.g., "/" → root)
-	// if len(segments) == 1 && segments[0] == "" {
-	// 	return applyRootAdd(update, op)
-	// }
+	t := field.ReflectionType
+	if t == nil {
+		return fmt.Errorf("ReflectionType is nil")
+	}
 
-	// Build MongoDB dot-path: join parent segments
-	// parentPath := strings.Join(segments[:len(segments)-1], ".")
-	// _ = parentPath + "." + last
-
-	// Special: append to array? → use $push (only if target is an array field)
-	// if isAppend {
-	// 	if parentPath == "" {
-	// 		return fmt.Errorf("cannot append to root: '-' only allowed on array fields")
-	// 	}
-	// 	return applyPush(update, parentPath, op.Value)
-	// }
-
-	// Normal add: use $set (create/replace)
 	var val any
+	var err error
 	if op.Value != nil {
-		if err := json.Unmarshal(op.Value, &val); err != nil {
+		val, err = unmarshalValue(op.Value, field.ReflectionType)
+		if err != nil {
 			return fmt.Errorf("unmarshal value for add '%s': %w", op.Path, err)
 		}
 	}
@@ -81,8 +65,8 @@ func applyRemove(update *MongoUpdate, path string) error {
 	return nil
 }
 
-func applyReplace(update *MongoUpdate, op Operation, path string) error {
-	return applyAdd(update, op, path)
+func applyReplace(update *MongoUpdate, op Operation, field *FieldInfo, path string) error {
+	return applyAdd(update, op, field, path)
 }
 
 func setField(m *bson.M, path string, val any) {
@@ -122,4 +106,36 @@ func parseIndex(s string) (isIndex bool, isNumeric bool, isAppend bool, err erro
 		return true, true, false, nil
 	}
 	return false, false, false, errNotAppendAction
+}
+
+var (
+	ErrNilValue = errors.New("nil value provided")
+)
+
+func unmarshalValue(raw json.RawMessage, targetType reflect.Type) (any, error) {
+
+	// If raw is nil or empty, we treat it as a nil value and return the zero value of the target type.
+	if raw == nil || len(raw) == 0 {
+		return nil, ErrNilValue
+	}
+
+	val := reflect.New(targetType).Interface() // Create a pointer to the target type
+	if err := json.Unmarshal(raw, &val); err != nil {
+		return nil, err
+	}
+
+	rval := dereferenceValue(val)
+	return rval, nil
+}
+
+func dereferenceValue(val any) any {
+
+	rval := reflect.ValueOf(val)
+	if rval.Kind() == reflect.Pointer {
+		rval = rval.Elem() // val now represents the actual data being pointed to
+	}
+	if rval.Kind() == reflect.Invalid {
+		return nil
+	}
+	return rval.Interface()
 }

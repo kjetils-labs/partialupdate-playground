@@ -3,7 +3,7 @@ package parsers
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
+	"log/slog"
 	"slices"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -40,12 +40,22 @@ func (mu *MongoUpdate) ToBSON() bson.D {
 	if mu.Push != nil {
 		update = append(update, bson.E{Key: "$push", Value: mu.Push})
 	}
+	if mu.Pull != nil {
+		update = append(update, bson.E{Key: "$pull", Value: mu.Pull})
+	}
+	if mu.SetOnInsert != nil {
+		update = append(update, bson.E{Key: "$setOnInsert", Value: mu.SetOnInsert})
+	}
+	if mu.Inc != nil {
+		update = append(update, bson.E{Key: "$inc", Value: mu.Inc})
+	}
 	return update
 }
 
 // Parse parses a []byte to []Operation, validates the request matches the RC6902,
 // validates it matches the requested type and outputs it as a MongoUpdate.
-func Parse[T any](request []byte) (*MongoUpdate, error) {
+// resourceType expects an instance of the type being updated.
+func Parse(request []byte, resourceType any) (*MongoUpdate, error) {
 
 	operations := make([]Operation, 0)
 
@@ -53,6 +63,7 @@ func Parse[T any](request []byte) (*MongoUpdate, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal request. %w", err)
 	}
+	slog.Debug("parsing patch request", "operations_count", len(operations))
 
 	// Validate the request operation(s) are valid per the spec.
 	// Does not validate the path(s) are valid for the resource.
@@ -61,12 +72,10 @@ func Parse[T any](request []byte) (*MongoUpdate, error) {
 		return nil, fmt.Errorf("request operation is invalid. %w", err)
 	}
 
-	typ := reflect.TypeFor[T]()
-	fieldMap := FieldMaps.Get(typ.Name())
-	if fieldMap == nil {
-		err = FieldMaps.Add(typ)
-		if err != nil {
-		}
+	fields := WalkStruct(resourceType)
+
+	if len(fields) == 0 {
+		return nil, fmt.Errorf("no fields found for type")
 	}
 
 	if readBeforeWrite(operations) {
@@ -75,7 +84,7 @@ func Parse[T any](request []byte) (*MongoUpdate, error) {
 
 	output := NewMongoUpdate()
 
-	err = parse(operations, output)
+	err = parse(operations, fields, output)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse operations to instructions. %w", err)
 	}
@@ -83,15 +92,21 @@ func Parse[T any](request []byte) (*MongoUpdate, error) {
 	return output, nil
 }
 
-func parse(operations []Operation, update *MongoUpdate) error {
+func parse(operations []Operation, fields []FieldInfo, update *MongoUpdate) error {
 
 	for _, operation := range operations {
 
-		// path, err := toMongoPath(operation.Path)
-		// if err != nil {
-		// 	return fmt.Errorf("failed to convert path %v to mongo path. %w", operation.Path, err)
-		// }
-		// slog.Info("converted path", "original_path", operation.Path, "mongo_path", path)
+		var field *FieldInfo
+		for _, p := range fields {
+			if p.Path == operation.Path {
+				field = &p
+				break
+			}
+		}
+		if field == nil {
+			return fmt.Errorf("path %v is not a valid path for type", operation.Path)
+		}
+
 		path, err := convertJSONPathMongo(operation.Path)
 		if err != nil {
 			return fmt.Errorf("path error in op %q: %w", operation.Op, err)
@@ -99,7 +114,7 @@ func parse(operations []Operation, update *MongoUpdate) error {
 
 		switch operation.Op {
 		case OperationTypeAdd:
-			if err := applyAdd(update, operation, path); err != nil {
+			if err := applyAdd(update, operation, field, path); err != nil {
 				return fmt.Errorf("failed to apply add. %w", err)
 			}
 		case OperationTypeRemove:
@@ -107,7 +122,7 @@ func parse(operations []Operation, update *MongoUpdate) error {
 				return fmt.Errorf("failed to apply remove. %w", err)
 			}
 		case OperationTypeReplace:
-			if err := applyReplace(update, operation, path); err != nil {
+			if err := applyReplace(update, operation, field, path); err != nil {
 				return fmt.Errorf("failed to apply replace. %w", err)
 			} // Will not be implemented as that requires read-before-write
 		case OperationTypeCopy:

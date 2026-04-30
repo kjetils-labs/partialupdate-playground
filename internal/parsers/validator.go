@@ -10,7 +10,7 @@ func ValidatePatch(patch []Operation) error {
 	for i, op := range patch {
 		switch op.Op {
 		case OperationTypeAdd, OperationTypeReplace, OperationTypeTest:
-			if len(op.Value) == 0 {
+			if len(op.Value) == 0 || op.Value == nil {
 				return fmt.Errorf("operation %d (%s) requires a non‑empty \"value\" field", i, op.Op)
 			}
 		case OperationTypeRemove:

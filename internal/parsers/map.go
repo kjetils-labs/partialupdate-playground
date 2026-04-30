@@ -70,7 +70,6 @@ func firstToLower(s string) string {
 func WalkStruct(str any) []FieldInfo {
 	initialPath := "/"
 	t := reflect.TypeOf(str)
-	// v := reflect.ValueOf(str)
 	return walkStruct(initialPath, t)
 }
 
@@ -88,11 +87,8 @@ func walkStruct(path string, str reflect.Type) []FieldInfo {
 func getFieldPath(path string, field reflect.StructField) []FieldInfo {
 	paths := make([]FieldInfo, 0)
 	kind := field.Type.Kind()
+	inline := field.Anonymous
 
-	if kind == reflect.Pointer {
-		kind = reflect.TypeOf(field.Type.Elem()).Kind()
-		// kind = field.Type.Elem().Kind()
-	}
 	name := ""
 	// quick and dirty way to get the first part of the json tag, which is
 	// the name
@@ -105,26 +101,50 @@ func getFieldPath(path string, field reflect.StructField) []FieldInfo {
 		name = tag
 	}
 
+	if field.Type.Kind() == reflect.Pointer {
+		ptr := field.Type.Elem()
+
+		if ptr.Kind() == reflect.Struct {
+
+			path += fmt.Sprintf("%s/", name)
+			addFieldInfo(name, path, field, &paths)
+
+			// walk the nested struct
+			_paths := walkStruct(path, ptr)
+			paths = append(paths, _paths...)
+			return paths
+		}
+	}
+
 	// we burrow down until we find all base types
 	if kind == reflect.Struct {
 
-		// make sure to add this struct as a part of the path
-		path += fmt.Sprintf("%s/", name)
+		// if the struct is inline, we don't want to add the struct name to the path
+		if !inline {
+			path += fmt.Sprintf("%s/", name)
+		}
+
+		addFieldInfo(name, path, field, &paths)
 
 		// walk the nested struct
-		_fields := walkStruct(path, field.Type)
-		paths = append(paths, _fields...)
+		_paths := walkStruct(path, field.Type)
+		paths = append(paths, _paths...)
 		return paths
 	}
 
 	path += name
 
-	finfo := FieldInfo{
+	addFieldInfo(name, path, field, &paths)
+
+	return paths
+}
+
+func addFieldInfo(name, path string, field reflect.StructField, out *[]FieldInfo) {
+	fieldInfo := FieldInfo{
 		Path:           path,
 		ReflectionType: field.Type,
 		Name:           name,
 	}
-	paths = append(paths, finfo)
 
-	return paths
+	*out = append(*out, fieldInfo)
 }

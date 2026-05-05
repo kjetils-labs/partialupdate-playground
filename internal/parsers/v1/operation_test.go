@@ -1,8 +1,8 @@
-package parsers_test
+package v1_test
 
 import (
 	"encoding/json"
-	"partialupdate/internal/parsers"
+	v1 "partialupdate/internal/parsers/v1"
 	"testing"
 )
 
@@ -10,7 +10,7 @@ func TestOperation_UnmarshalJSON(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		want     *parsers.Operation
+		want     *v1.Operation
 		wantErr  bool
 		errCheck func(error) bool
 	}{
@@ -18,17 +18,17 @@ func TestOperation_UnmarshalJSON(t *testing.T) {
 		{
 			name:  "add with value (string)",
 			input: `{"op":"add","path":"/a","value":"b"}`,
-			want:  &parsers.Operation{Op: parsers.OperationTypeAdd, Path: "/a", Value: json.RawMessage(`"b"`)},
+			want:  &v1.Operation{Op: v1.OperationTypeAdd, Path: "/a", Value: json.RawMessage(`"b"`)},
 		},
 		{
 			name:  "add with value (number)",
 			input: `{"op":"add","path":"/count","value":42}`,
-			want:  &parsers.Operation{Op: parsers.OperationTypeAdd, Path: "/count", Value: json.RawMessage(`42`)},
+			want:  &v1.Operation{Op: v1.OperationTypeAdd, Path: "/count", Value: json.RawMessage(`42`)},
 		},
 		{
 			name:  "add with value (object)",
 			input: `{"op":"add","path":"/user","value":{"name":"Alice"}}`,
-			want:  &parsers.Operation{Op: parsers.OperationTypeAdd, Path: "/user", Value: json.RawMessage(`{"name":"Alice"}`)},
+			want:  &v1.Operation{Op: v1.OperationTypeAdd, Path: "/user", Value: json.RawMessage(`{"name":"Alice"}`)},
 		},
 		{
 			name:     "add missing value",
@@ -41,19 +41,19 @@ func TestOperation_UnmarshalJSON(t *testing.T) {
 		{
 			name:  "remove (no value needed)",
 			input: `{"op":"remove","path":"/foo"}`,
-			want:  &parsers.Operation{Op: parsers.OperationTypeRemove, Path: "/foo"},
+			want:  &v1.Operation{Op: v1.OperationTypeRemove, Path: "/foo"},
 		},
 		{
 			name:  "remove with extra fields ignored",
 			input: `{"op":"remove","path":"/bar","value":"ignored"}`,
-			want:  &parsers.Operation{Op: parsers.OperationTypeRemove, Path: "/bar"}, // value is ignored (but not validated against)
+			want:  &v1.Operation{Op: v1.OperationTypeRemove, Path: "/bar"}, // value is ignored (but not validated against)
 		},
 
 		// --- REPLACE ---
 		{
 			name:  "replace with value",
 			input: `{"op":"replace","path":"/name","value":"Bob"}`,
-			want:  &parsers.Operation{Op: parsers.OperationTypeReplace, Path: "/name", Value: json.RawMessage(`"Bob"`)},
+			want:  &v1.Operation{Op: v1.OperationTypeReplace, Path: "/name", Value: json.RawMessage(`"Bob"`)},
 		},
 		{
 			name:     "replace missing value",
@@ -66,7 +66,7 @@ func TestOperation_UnmarshalJSON(t *testing.T) {
 		{
 			name:  "move valid",
 			input: `{"op":"move","from":"/a","path":"/b"}`,
-			want:  &parsers.Operation{Op: parsers.OperationTypeMove, Path: "/b", From: "/a"},
+			want:  &v1.Operation{Op: v1.OperationTypeMove, Path: "/b", From: "/a"},
 		},
 		{
 			name:     "move missing from",
@@ -79,7 +79,7 @@ func TestOperation_UnmarshalJSON(t *testing.T) {
 		{
 			name:  "copy valid",
 			input: `{"op":"copy","from":"/x","path":"/y"}`,
-			want:  &parsers.Operation{Op: parsers.OperationTypeCopy, Path: "/y", From: "/x"},
+			want:  &v1.Operation{Op: v1.OperationTypeCopy, Path: "/y", From: "/x"},
 		},
 		{
 			name:     "copy missing from",
@@ -92,7 +92,7 @@ func TestOperation_UnmarshalJSON(t *testing.T) {
 		{
 			name:  "test with value",
 			input: `{"op":"test","path":"/status","value":"active"}`,
-			want:  &parsers.Operation{Op: parsers.OperationTypeTest, Path: "/status", Value: json.RawMessage(`"active"`)},
+			want:  &v1.Operation{Op: v1.OperationTypeTest, Path: "/status", Value: json.RawMessage(`"active"`)},
 		},
 		{
 			name:     "test missing value",
@@ -116,30 +116,30 @@ func TestOperation_UnmarshalJSON(t *testing.T) {
 		{
 			name:  "value can be array",
 			input: `{"op":"add","path":"/items","value":[1,2,3]}`,
-			want:  &parsers.Operation{Op: parsers.OperationTypeAdd, Path: "/items", Value: json.RawMessage(`[1,2,3]`)},
+			want:  &v1.Operation{Op: v1.OperationTypeAdd, Path: "/items", Value: json.RawMessage(`[1,2,3]`)},
 		},
 		{
 			name:  "value can be boolean/null",
 			input: `{"op":"test","path":"/flag","value":true}`,
-			want:  &parsers.Operation{Op: parsers.OperationTypeTest, Path: "/flag", Value: json.RawMessage(`true`)},
+			want:  &v1.Operation{Op: v1.OperationTypeTest, Path: "/flag", Value: json.RawMessage(`true`)},
 		},
 		{
 			name:  "value can be null",
 			input: `{"op":"add","path":"/opt","value":null}`,
-			want:  &parsers.Operation{Op: parsers.OperationTypeAdd, Path: "/opt", Value: json.RawMessage(`null`)},
+			want:  &v1.Operation{Op: v1.OperationTypeAdd, Path: "/opt", Value: json.RawMessage(`null`)},
 		},
 
 		// --- Whitespace/extra fields (should be ignored) ---
 		{
 			name:  "extra fields allowed (JSON permissive)",
 			input: `{"op":"add","path":"/a","value":"b","extra":"ignored"}`,
-			want:  &parsers.Operation{Op: parsers.OperationTypeAdd, Path: "/a", Value: json.RawMessage(`"b"`)},
+			want:  &v1.Operation{Op: v1.OperationTypeAdd, Path: "/a", Value: json.RawMessage(`"b"`)},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var op parsers.Operation
+			var op v1.Operation
 			err := op.UnmarshalJSON([]byte(tt.input))
 
 			if (err != nil) != tt.wantErr {
@@ -177,7 +177,7 @@ func findSubstring(s, substr string) bool {
 }
 
 // Add this to your Operation type for comparison
-func Equal(o1, o2 *parsers.Operation) bool {
+func Equal(o1, o2 *v1.Operation) bool {
 	if o1 == o2 {
 		return true
 	}

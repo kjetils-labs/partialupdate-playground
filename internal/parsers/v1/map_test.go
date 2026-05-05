@@ -1,8 +1,8 @@
-package parsersv2_test
+package v1_test
 
 import (
 	"partialupdate/internal/models"
-	"partialupdate/internal/parsersv2"
+	v1 "partialupdate/internal/parsers/v1"
 	"reflect"
 	"testing"
 
@@ -13,7 +13,7 @@ type testCase struct {
 	name     string
 	path     string
 	input    any
-	expected parsersv2.FieldInfo
+	expected v1.FieldInfo
 	wantErr  bool
 	errCheck func(error) bool
 }
@@ -25,7 +25,7 @@ func TestWalkStruct(t *testing.T) {
 			name:  "walk root",
 			path:  "/",
 			input: models.Resource{},
-			expected: parsersv2.FieldInfo{
+			expected: v1.FieldInfo{
 				Path:           "/",
 				ReflectionType: reflect.TypeFor[models.Resource](),
 				Name:           "Resource",
@@ -35,7 +35,7 @@ func TestWalkStruct(t *testing.T) {
 			name:  "walk field",
 			path:  "/id",
 			input: models.Resource{},
-			expected: parsersv2.FieldInfo{
+			expected: v1.FieldInfo{
 				Path:           "/id",
 				ReflectionType: reflect.TypeFor[string](),
 				Name:           "id",
@@ -45,7 +45,7 @@ func TestWalkStruct(t *testing.T) {
 			name:  "walk nested field",
 			path:  "/carResource/model",
 			input: models.Resource{},
-			expected: parsersv2.FieldInfo{
+			expected: v1.FieldInfo{
 				Path:           "/carResource/model",
 				ReflectionType: reflect.TypeFor[string](),
 				Name:           "model",
@@ -55,7 +55,7 @@ func TestWalkStruct(t *testing.T) {
 			name:  "walk pointer field",
 			path:  "/personResource",
 			input: models.Resource{},
-			expected: parsersv2.FieldInfo{
+			expected: v1.FieldInfo{
 				Path:           "/personResource",
 				ReflectionType: reflect.TypeFor[models.Resource](),
 				Name:           "personResource",
@@ -65,7 +65,7 @@ func TestWalkStruct(t *testing.T) {
 			name:  "walk nested pointer field string",
 			path:  "/personResource/name",
 			input: models.Resource{},
-			expected: parsersv2.FieldInfo{
+			expected: v1.FieldInfo{
 				Path:           "/personResource/name",
 				ReflectionType: reflect.TypeFor[string](),
 				Name:           "name",
@@ -75,7 +75,7 @@ func TestWalkStruct(t *testing.T) {
 			name:  "walk nested pointer field int",
 			path:  "/personResource/personData/personalNumber",
 			input: models.Resource{},
-			expected: parsersv2.FieldInfo{
+			expected: v1.FieldInfo{
 				Path:           "/personResource/personData/personalNumber",
 				ReflectionType: reflect.TypeFor[int](),
 				Name:           "personalNumber",
@@ -94,17 +94,37 @@ func TestWalkStruct(t *testing.T) {
 			name:  "1 layer map field",
 			path:  "/personResource/tags/fork",
 			input: models.Resource{},
-			expected: parsersv2.FieldInfo{
+			expected: v1.FieldInfo{
 				Path:           "/personResource/tags/fork",
 				ReflectionType: reflect.TypeFor[string](),
 				Name:           "tags",
+			},
+		},
+		{
+			name:  "struct map",
+			path:  "/personResource/structTags",
+			input: models.Resource{},
+			expected: v1.FieldInfo{
+				Path:           "/personResource/structTags",
+				ReflectionType: reflect.TypeFor[map[string]models.Car](),
+				Name:           "structTags",
+			},
+		},
+		{
+			name:  "struct map nested field",
+			path:  "/personResource/structTags/somevalue/horses/horses",
+			input: models.Resource{},
+			expected: v1.FieldInfo{
+				Path:           "/personResource/structTags/somevalue/horses/horses",
+				ReflectionType: reflect.TypeFor[int](),
+				Name:           "horses",
 			},
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := parsersv2.WalkStruct(tc.path, tc.input)
+			got, err := v1.WalkStruct(tc.path, tc.input)
 			if err != nil {
 
 				if tc.wantErr {

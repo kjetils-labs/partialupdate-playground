@@ -1,12 +1,12 @@
-package parsers_test
+package v1_test
 
 import (
 	"encoding/json"
-	"partialupdate/internal/parsers"
+	v1 "partialupdate/internal/parsers/v1"
 	"testing"
 )
 
-type testCase struct {
+type testCaseValidator struct {
 	name        string // descriptive name for the sub‑test
 	opsJSON     string // JSON representation of []Operation
 	wantErr     bool   // true → an error is expected
@@ -15,7 +15,7 @@ type testCase struct {
 
 func TestValidatePatch(t *testing.T) {
 
-	cases := []testCase{
+	cases := []testCaseValidator{
 		{
 			name: "valid add (value required)",
 			opsJSON: `[{
@@ -126,7 +126,7 @@ func TestValidatePatch(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Decode the JSON test case into []Operation.
-			var ops []parsers.Operation
+			var ops []v1.Operation
 			if err := json.Unmarshal([]byte(tc.opsJSON), &ops); err != nil {
 				if tc.wantErr && contains(err.Error(), tc.errContains) {
 					return
@@ -136,7 +136,7 @@ func TestValidatePatch(t *testing.T) {
 			}
 
 			// Run the validator.
-			err := parsers.ValidatePatch(ops)
+			err := v1.ValidatePatch(ops)
 
 			switch {
 			case tc.wantErr && err == nil:

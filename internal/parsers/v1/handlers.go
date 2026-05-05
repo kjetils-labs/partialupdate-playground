@@ -1,4 +1,4 @@
-package parsers
+package v1
 
 import (
 	"encoding/json"
@@ -115,7 +115,7 @@ var (
 func unmarshalValue(raw json.RawMessage, targetType reflect.Type) (any, error) {
 
 	// If raw is nil or empty, we treat it as a nil value and return the zero value of the target type.
-	if raw == nil || len(raw) == 0 {
+	if len(raw) == 0 {
 		return nil, ErrNilValue
 	}
 

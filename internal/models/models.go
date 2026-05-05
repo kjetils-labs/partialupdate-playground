@@ -7,15 +7,21 @@ type Resource struct {
 }
 
 type Car struct {
-	ID    string `json:"id,omitempty" bson:"id,omitempty"`
-	Make  string `json:"make,omitempty" bson:"make,omitempty"`
-	Model string `json:"model,omitempty" bson:"model,omitempty"`
+	ID     string     `json:"id,omitempty" bson:"id,omitempty"`
+	Make   string     `json:"make,omitempty" bson:"make,omitempty"`
+	Model  string     `json:"model,omitempty" bson:"model,omitempty"`
+	Horses *CarHorses `json:"horses,omitempty" bson:"horses,omitempty"`
+}
+
+type CarHorses struct {
+	Horses int `json:"horses,omitempty" bson:"horses,omitempty"`
 }
 
 type Person struct {
 	ID              string             `json:"id,omitempty" bson:"id,omitempty"`
 	Name            string             `json:"name,omitempty" bson:"name,omitempty"`
 	Tags            map[string]string  `json:"tags,omitempty" bson:"tags,omitempty"`
+	StructTags      map[string]Car     `json:"structTags,omitempty" bson:"structTags,omitempty"`
 	PointerTags     map[string]*string `json:"pointerTags,omitempty" bson:"pointerTags,omitempty"`
 	Slice           []string           `json:"slice,omitempty" bson:"slice,omitempty"`
 	PointerSlice    []*string          `json:"pointerSlice,omitempty" bson:"pointerSlice,omitempty"`

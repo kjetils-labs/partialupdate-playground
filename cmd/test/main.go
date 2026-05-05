@@ -3,7 +3,7 @@ package main
 import (
 	"log/slog"
 	"partialupdate/internal/models"
-	"partialupdate/internal/parsersv2"
+	v1 "partialupdate/internal/parsers/v1"
 )
 
 func main() {
@@ -15,9 +15,14 @@ func main() {
 	// }
 	//
 	// type Car struct {
-	// 	ID    string `json:"id,omitempty" bson:"id,omitempty"`
-	// 	Make  string `json:"make,omitempty" bson:"make,omitempty"`
-	// 	Model string `json:"model,omitempty" bson:"model,omitempty"`
+	// 	ID     string     `json:"id,omitempty" bson:"id,omitempty"`
+	// 	Make   string     `json:"make,omitempty" bson:"make,omitempty"`
+	// 	Model  string     `json:"model,omitempty" bson:"model,omitempty"`
+	// 	Horses *CarHorses `json:"horses,omitempty" bson:"horses,omitempty"`
+	// }
+	//
+	// type CarHorses struct {
+	// 	Horses int `json:"horses,omitempty" bson:"horses,omitempty"`
 	// }
 	//
 	// type Person struct {
@@ -53,7 +58,7 @@ func main() {
 	// 	LikesCheesecake bool `json:"likesCheesecake,omitempty" bson:"likesCheesecake,omitempty"`
 	// }
 
-	fields, err := parsersv2.WalkStruct("/personResource/pointerTags/fork", models.Resource{})
+	fields, err := v1.WalkStruct("/personResource/structTags/somevalue/horses/horses", models.Resource{})
 	if err != nil {
 		slog.Error("error walking struct", "error", err)
 		return

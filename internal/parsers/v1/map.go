@@ -1,4 +1,4 @@
-package parsersv2
+package v1
 
 import (
 	"fmt"
@@ -24,10 +24,6 @@ func WalkStruct(path string, str any) (*FieldInfo, error) {
 }
 
 func walkStruct(path string, str reflect.Type) (*FieldInfo, error) {
-
-	if path == "" {
-		return nil, fmt.Errorf("path cannot be empty")
-	}
 
 	// Check if the path is just the root ("/") and return the struct type if so.
 	root := getOnlyRootField(path, str)
@@ -126,27 +122,37 @@ func getFieldPath(paths []string, rtype reflect.Type, jpath string) (*FieldInfo,
 
 		// if the field is a map, we need to key-value pair and continue searching for the path in the value type.
 		if isMap(field) {
-			value := field.Type.Elem()
-			jpath += fmt.Sprintf("%s/", name)
 
-			// if a high depth is expected, we need to continue searching for the path in the value type.
-			if len(paths)-1 > 1 {
-				return getFieldPath(paths[1:], value, jpath)
+			// If the map field is the end of the path, we can return the field info with the map type.
+			if len(paths) == 1 {
+				jpath += fmt.Sprintf("%s", name)
+				out := &FieldInfo{
+					Path:           jpath,
+					ReflectionType: field.Type,
+					Name:           name,
+				}
+				return out, nil
 			}
 
+			value := field.Type.Elem()
 			if value.Kind() == reflect.Pointer {
 				value = value.Elem()
 			}
 
-			// if the paths search is at the end, we can return the field info with the map value type.
-			jpath += fmt.Sprintf("%s", paths[1])
+			if len(paths) > 2 {
+				// TODO: check if the key is valid for the map type (i.e. if the key is a string and the map key type is string)
+				jpath += fmt.Sprintf("%s/%s/", name, paths[1])
+				return getFieldPath(paths[2:], value, jpath)
+			}
+
+			jpath += fmt.Sprintf("%s/%s", name, paths[1])
 			out := &FieldInfo{
 				Path:           jpath,
 				ReflectionType: value,
 				Name:           name,
 			}
-			return out, nil
 
+			return out, nil
 		}
 
 		// if the field is a base type, we need to check if the path is empty (i.e. we have reached the end of the path) and return the field info if so.

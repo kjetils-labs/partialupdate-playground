@@ -1,11 +1,10 @@
-package parsers
+package v1
 
 import "fmt"
 
 // ValidatePatch valides that the operation(s) are valid per the RFC6902 spec,
 // that the operation is valid, required field(s) for that type of operation is present.
 // It does not validate that the paths used in the operation(s) are valid for the request.
-// TODO: Add path validation
 func ValidatePatch(patch []Operation) error {
 	for i, op := range patch {
 		switch op.Op {

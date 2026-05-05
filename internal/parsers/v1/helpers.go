@@ -1,4 +1,4 @@
-package parsers
+package v1
 
 import (
 	"fmt"

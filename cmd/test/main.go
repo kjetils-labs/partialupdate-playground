@@ -3,7 +3,7 @@ package main
 import (
 	"log/slog"
 	"partialupdate/internal/models"
-	v1 "partialupdate/internal/parsers/v1"
+	v2 "partialupdate/internal/parsers/v2"
 )
 
 func main() {
@@ -58,11 +58,77 @@ func main() {
 	// 	LikesCheesecake bool `json:"likesCheesecake,omitempty" bson:"likesCheesecake,omitempty"`
 	// }
 
-	fields, err := v1.WalkStruct("/personResource/structTags/somevalue/horses/horses", models.Resource{})
-	if err != nil {
-		slog.Error("error walking struct", "error", err)
-		return
-	}
+	// operationsJSON := `
+	// [
+	// 	{
+	// 		"op":"add",
+	// 		"path":"/personResource/structTags/somevalue/horses/horses",
+	// 		"value":42
+	// 	},
+	// 	{
+	// 		"op":"add",
+	// 		"path":"/personResource/ageInt",
+	// 		"value":42
+	// 	},
+	// 	{
+	// 		"op":"remove",
+	// 		"path":"/personResource/ageInt8"
+	// 	},
+	// 	{
+	// 		"op":"replace",
+	// 		"path":"/personResource/ageInt16",
+	// 		"value":42
+	// 	}
+	// ]
+	// `
+	//
+	// update, err := v1.Parse([]byte(operationsJSON), models.Resource{})
+	// if err != nil {
+	// 	slog.Error("failed to parse operations", "error", err)
+	// 	return
+	// }
+	//
+	// bUpdate := update.ToBSON()
+	//
+	// slog.Info("converted operations", "bson", bUpdate)
 
-	slog.Info("walked struct fields", "fields", fields)
+	// b, err := json.Marshal(models.Resource{
+	// 	ID: "123",
+	// 	CarResource: models.Car{
+	// 		ID:    "car123",
+	// 		Make:  "Toyota",
+	// 		Model: "Corolla",
+	// 	},
+	// 	PersonResource: nil,
+	// })
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	bJSON := []byte(`{
+		"id": "123",
+		"carResource": {
+			"id": "car123",
+			"make": "Toyota",
+			"model": "Corolla"
+		},
+		"personResource": {
+			"name": "Alice",
+			"age": null
+		}
+	}`)
+
+	// var out map[string]any
+	// err := json.Unmarshal(bJSON, &out)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// slog.Info("unmarshaled JSON", "output", out)
+
+	// TODO: Make null do unset actions
+	update, err := v2.ParsePatch[models.Resource](bJSON)
+	if err != nil {
+		panic(err)
+	}
+	slog.Info("converted patch", "update", update)
 }

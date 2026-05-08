@@ -120,6 +120,26 @@ func TestWalkStruct(t *testing.T) {
 				Name:           "horses",
 			},
 		},
+		{
+			name:  "append to slice",
+			path:  "/personResource/slice/-",
+			input: models.Resource{},
+			expected: v1.FieldInfo{
+				Path:           "/personResource/slice/-",
+				ReflectionType: reflect.TypeFor[string](),
+				Name:           "slice",
+			},
+		},
+		{
+			name:  "get slice",
+			path:  "/personResource/slice",
+			input: models.Resource{},
+			expected: v1.FieldInfo{
+				Path:           "/personResource/slice",
+				ReflectionType: reflect.TypeFor[[]string](),
+				Name:           "slice",
+			},
+		},
 	}
 
 	for _, tc := range tests {

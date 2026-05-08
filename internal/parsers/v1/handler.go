@@ -11,6 +11,26 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+func ApplyOperation(update *MongoUpdate, op Operation, field *FieldInfo) error {
+
+	mongoPath, err := convertJSONPathMongo(op.Path)
+	if err != nil {
+		return fmt.Errorf("failed to convert JSON path to MongoDB path for '%s': %w", op.Path, err)
+	}
+
+	switch op.Op {
+	case OperationTypeAdd:
+		return applyAdd(update, op, field, mongoPath)
+	case OperationTypeRemove:
+		return applyRemove(update, mongoPath)
+	case OperationTypeReplace:
+		return applyReplace(update, op, field, mongoPath)
+	default:
+		return fmt.Errorf("unsupported operation type: %s", op.Op)
+	}
+}
+
+// applyAdd updates the MongoUpdate with $set for the given path and value.
 func applyAdd(update *MongoUpdate, op Operation, field *FieldInfo, path string) error {
 
 	t := field.ReflectionType

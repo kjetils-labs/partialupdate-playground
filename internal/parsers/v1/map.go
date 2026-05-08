@@ -31,8 +31,6 @@ func walkStruct(path string, str reflect.Type) (*FieldInfo, error) {
 		return root, nil
 	}
 
-	// var out *FieldInfo
-	// var err error
 	paths := splitPath(path)
 
 	if len(paths) == 0 {
@@ -55,33 +53,23 @@ func getFieldPath(paths []string, rtype reflect.Type, jpath string) (*FieldInfo,
 			continue
 		}
 
-		slog.Info("field status", "field_name", name, "is_pointer", isFieldPointer(field), "is_struct", isStruct(field), "is_inline", isInline(field), "is_base_type", isBaseType(field), "paths_left", len(paths)-1)
-
-		// // if we have reached the end of the path and the field is not a struct or pointer, we can return the field info.
-		// if len(paths) == 1 {
-		// 	out := &FieldInfo{
-		// 		Path:           jpath,
-		// 		ReflectionType: field.Type,
-		// 		Name:           name,
-		// 	}
-		// 	return out, nil
-		// }
+		slog.Debug("field status", "field_name", name, "is_pointer", isFieldPointer(field), "is_struct", isStruct(field), "is_inline", isInline(field), "is_base_type", isBaseType(field), "paths_left", len(paths)-1)
 
 		// if the field is a pointer, we need to dereference it and continue searching for the path in the underlying type.
 		if isFieldPointer(field) {
 			ptr := field.Type.Elem()
 
 			if len(paths)-1 == 0 {
-				jpath += fmt.Sprintf("%s", name)
+				jpath += fmt.Sprintf("%s", path)
 				out := &FieldInfo{
 					Path:           jpath,
 					ReflectionType: ptr,
-					Name:           name,
+					Name:           path,
 				}
 				return out, nil
 			}
 
-			jpath += fmt.Sprintf("%s/", name)
+			jpath += fmt.Sprintf("%s/", path)
 			return getFieldPath(paths[1:], ptr, jpath)
 		}
 
@@ -93,19 +81,47 @@ func getFieldPath(paths []string, rtype reflect.Type, jpath string) (*FieldInfo,
 				return getFieldPath(paths[1:], field.Type, jpath)
 			}
 
-			jpath += fmt.Sprintf("%s/", name)
+			jpath += fmt.Sprintf("%s/", path)
 			return getFieldPath(paths[1:], field.Type, jpath)
 		}
 
 		if isSlice(field) {
-			indexs := paths[1]
-			index, err := strconv.ParseInt(indexs, 10, 64)
-			if err != nil {
-				return nil, fmt.Errorf("component %q is not a valid index", indexs)
-			}
-			value := field.Type.Elem()
 
-			jpath += fmt.Sprintf("%s/%d/", name, index)
+			// if the slice field is the end of the path, we can return the field info with the slice type.
+			if len(paths) == 1 {
+				jpath += fmt.Sprintf("%s", path)
+				out := &FieldInfo{
+					Path:           jpath,
+					ReflectionType: field.Type,
+					Name:           path,
+				}
+
+				return out, nil
+			}
+
+			// if the next path component is "-", we need to check if it's the end of the path and return the field info with the slice element type.
+			// If it's not the end of the path, we return an error since - is only allowed at the end of the path for appending to a slice.
+			if paths[1] == "-" {
+				if len(paths) > 2 {
+					return nil, fmt.Errorf("- operation is only allowed at the end of the path")
+				}
+				jpath += fmt.Sprintf("%s/%v", path, paths[1])
+				value := field.Type.Elem()
+				out := &FieldInfo{
+					Path:           jpath,
+					ReflectionType: value,
+					Name:           path,
+				}
+				return out, nil
+			} else {
+				index, err := strconv.ParseInt(paths[1], 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("component %q is not a valid index", paths[1])
+				}
+				jpath += fmt.Sprintf("%s/%d/", path, index)
+			}
+
+			value := field.Type.Elem()
 
 			if !isBaseType(field) {
 				return getFieldPath(paths[1:], value, jpath)
@@ -114,7 +130,7 @@ func getFieldPath(paths []string, rtype reflect.Type, jpath string) (*FieldInfo,
 			out := &FieldInfo{
 				Path:           jpath,
 				ReflectionType: value,
-				Name:           name,
+				Name:           path,
 			}
 
 			return out, nil
@@ -159,8 +175,6 @@ func getFieldPath(paths []string, rtype reflect.Type, jpath string) (*FieldInfo,
 		if isBaseType(field) {
 
 			jpath += fmt.Sprintf("%s", name)
-			slog.Info("base type field found", "field_name", name, "field_type", field.Type, "path", jpath)
-
 			out := &FieldInfo{
 				Path:           jpath,
 				ReflectionType: field.Type,

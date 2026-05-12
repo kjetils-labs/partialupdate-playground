@@ -150,25 +150,25 @@ func TestParsePatch(t *testing.T) {
 			},
 			wantErr: false,
 		},
-		// {
-		// 	name: "mismatched fields in JSON (extra fields)",
-		// 	patchJSON: `{
-		// 		"id": "123",
-		// 		"carResource": {
-		// 			"id": "car123",
-		// 			"make": "Toyota",
-		// 			"model": "Corolla",
-		// 			"color": "red"
-		// 		},
-		// 		"personResource": {
-		// 			"name": "Alice",
-		// 			"ageInt": 30,
-		// 			"hobby": "painting"
-		// 		}
-		// 	}`,
-		// 	wantErr:     true,                                   // extra fields should be ignored, not cause an error
-		// 	errContains: "unknown field 'color' in carResource", // if you want to check for specific error message
-		// },
+		{
+			name: "mismatched fields in JSON (extra fields)",
+			patchJSON: `{
+				"id": "123",
+				"carResource": {
+					"id": "car123",
+					"make": "Toyota",
+					"model": "Corolla",
+					"color": "red"
+				},
+				"personResource": {
+					"name": "Alice",
+					"ageInt": 30,
+					"hobby": "painting"
+				}
+			}`,
+			wantErr:     true,                                // extra fields should be ignored, not cause an error
+			errContains: "failed to walk struct for fields:", // if you want to check for specific error message
+		},
 		{
 			name: "struct in value field (invalid)",
 			patchJSON: `{
@@ -191,6 +191,9 @@ func TestParsePatch(t *testing.T) {
 			patchJSON: `{
 				"personResource": {
 					"name": "Alice",
+					"pointerString": "pointer value",
+					"pointerInt": 42,
+					"pointerBool": true,
 					"ageInt": 30,
 					"ageInt8": 30,
 					"ageInt16": 30,
@@ -198,39 +201,24 @@ func TestParsePatch(t *testing.T) {
 					"ageInt64": 30
 				}
 			}`,
-			// patchJSON: `{
-			// 	"personResource": {
-			// 		"name": "Alice",
-			// 		"pointerString": "pointer value",
-			// 		"pointerInt": 42,
-			// 		"ageInt": 30,
-			// 		"ageInt8": 30,
-			// 		"ageInt16": 30,
-			// 		"ageInt32": 30,
-			// 		"ageInt64": 30
-			// 	}
-			// }`,
 			wantErr: false,
 			Expected: v1.MongoUpdate{
 				Set: bson.M{
-					"personResource.name":     "Alice",
-					"personResource.ageInt":   30,
-					"personResource.ageInt8":  int8(30),
-					"personResource.ageInt16": int16(30),
-					"personResource.ageInt32": int32(30),
-					"personResource.ageInt64": int64(30),
-					// "personResource.pointerString": "pointer value",
-					// "personResource.pointerInt":    42,
+					"personResource.name":          "Alice",
+					"personResource.ageInt":        30,
+					"personResource.ageInt8":       int8(30),
+					"personResource.ageInt16":      int16(30),
+					"personResource.ageInt32":      int32(30),
+					"personResource.ageInt64":      int64(30),
+					"personResource.pointerString": "pointer value",
+					"personResource.pointerInt":    42,
+					"personResource.pointerBool":   true,
 				},
 				Unset: bson.M{},
 				Push:  bson.M{},
 				Pull:  bson.M{},
 			},
 		},
-		// TODO: add test for:
-		// - Pointer string
-		// - Pointer int
-		// - Fail with invalid field path (e.g. "carResource.invalidField": "value")
 	}
 
 	for _, tc := range cases {

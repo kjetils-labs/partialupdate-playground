@@ -3,7 +3,6 @@ package v2
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	v1 "partialupdate/internal/parsers/v1"
 	"reflect"
 	"strconv"
@@ -20,7 +19,7 @@ func ParsePatch[T any](patch []byte) (*v1.MongoUpdate, error) {
 
 	fields, err := WalkStruct(input, new(T))
 	if err != nil {
-		slog.Error("failed to walk struct for fields", "error", err)
+		return nil, fmt.Errorf("failed to walk struct for fields: %w", err)
 	}
 
 	output := v1.NewMongoUpdate()
@@ -33,7 +32,6 @@ func ParsePatch[T any](patch []byte) (*v1.MongoUpdate, error) {
 
 		val, err := convertToType(field.Value, field.ReflectionType)
 		if err != nil {
-			slog.Error("failed to convert value to target type", "error", err, "field_path", field.Path, "field_type", field.ReflectionType.String(), "field_value", field.Value)
 			return nil, fmt.Errorf("failed to convert value for field '%s': %w", field.Path, err)
 		}
 		output.Set[field.Path] = val

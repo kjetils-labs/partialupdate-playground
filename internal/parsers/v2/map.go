@@ -2,7 +2,6 @@ package v2
 
 import (
 	"fmt"
-	"log/slog"
 	"reflect"
 	"strings"
 )
@@ -39,8 +38,7 @@ func traversePath(pathmap map[string]any, rtype reflect.Type) ([]*FieldInfo, err
 	for k, v := range pathmap {
 		out, err := getFieldPath(k, v, rtype, "", 0)
 		if err != nil {
-			slog.Error("failed to get field path for key", "key", k, "error", err)
-			continue
+			return nil, err
 		}
 		output = append(output, out...)
 	}
@@ -60,11 +58,17 @@ func getFieldPath(k, v any, rtype reflect.Type, mpath string, depth int) ([]*Fie
 		}
 
 		if isFieldPointer(field) {
-			// If the value is nil, we assume the pointer field is being set to nil, so we return the field info with a nil value.
 			if v == nil {
 				addFieldInfo(&output, mpath, field.Type, name, nil)
-				continue
+				return output, nil
 			}
+
+			// If the pointer is to a base type, we can add the field info and return immediately since there are no further paths to traverse.
+			if field.Type.Elem().Kind() != reflect.Struct && field.Type.Elem().Kind() != reflect.Map {
+				addFieldInfo(&output, mpath+"."+name, field.Type.Elem(), name, v)
+				return output, nil
+			}
+
 			if value, ok := v.(map[string]any); ok {
 				if mpath == "" {
 					mpath += name
@@ -72,24 +76,22 @@ func getFieldPath(k, v any, rtype reflect.Type, mpath string, depth int) ([]*Fie
 					mpath += "." + name
 				}
 				for mk, mv := range value {
-					if mv != nil {
-						out, err := getFieldPath(mk, mv, field.Type.Elem(), mpath, depth+1)
-						if err != nil {
-							slog.Error("failed to get field path for pointer field", "field_name", name, "error", err)
-							continue
-						}
-						output = append(output, out...)
-					} else {
+					if mv == nil {
 						addFieldInfo(&output, mpath+"."+mk, field.Type, name, nil)
 						continue
 					}
+					out, err := getFieldPath(mk, mv, field.Type.Elem(), mpath, depth+1)
+					if err != nil {
+						return nil, err
+					}
+					output = append(output, out...)
 				}
+				return output, nil
 			}
 
 			out, err := getFieldPath(k, v, field.Type.Elem(), mpath, depth+1)
 			if err != nil {
-				slog.Error("failed to get field path for pointer field", "field_name", name, "error", err)
-				continue
+				return nil, err
 			}
 			output = append(output, out...)
 			continue
@@ -112,43 +114,37 @@ func getFieldPath(k, v any, rtype reflect.Type, mpath string, depth int) ([]*Fie
 			// If the value is nil, we assume the struct field is being set to nil, so we return the field info with a nil value.
 			if v == nil {
 				addFieldInfo(&output, mpath, field.Type, name, nil)
-				continue
+				return output, nil
 			}
 
 			if value, ok := v.(map[string]any); ok {
 				for mk, mv := range value {
 					if mv == nil {
 						addFieldInfo(&output, mpath, field.Type, mk, nil)
-						continue
+						return output, nil
 					}
 
 					out, err := getFieldPath(mk, mv, field.Type, mpath, depth+1)
 					if err != nil {
-						slog.Error("failed to get field path for map field", "field_name", name, "error", err)
 						continue
 					}
 					output = append(output, out...)
 				}
 			} else {
-				slog.Error("expected a map for map field", "field_name", name, "value_type", fmt.Sprintf("%T", v))
+				return nil, fmt.Errorf("expected map[string]any for struct field '%s', got %T", name, v)
 			}
-			continue
+			return output, nil
 		}
 
 		// if the field is a base type, we need to check if the path is empty (i.e. we have reached the end of the path) and return the field info if so.
 		if isBaseType(field) {
-
-			if v == nil {
-				addFieldInfo(&output, mpath, field.Type, name, nil)
-				continue
-			}
-
 			addFieldInfo(&output, mpath, field.Type, name, v)
+			return output, nil
 		}
 
 	}
 
-	return output, nil
+	return output, fmt.Errorf("field '%v' not found in struct", k)
 }
 
 // addFieldInfo is a helper function to create a FieldInfo struct and append it to the output slice.

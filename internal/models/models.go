@@ -27,7 +27,8 @@ type Person struct {
 	Slice           []string           `json:"slice,omitempty" bson:"slice,omitempty"`
 	PointerSlice    []*string          `json:"pointerSlice,omitempty" bson:"pointerSlice,omitempty"`
 	Alive           bool               `json:"alive,omitempty" bson:"alive,omitempty"`
-	IntPointer      *int               `json:"intPointer,omitempty" bson:"intPointer,omitempty"`
+	PointerBool     *bool              `json:"pointerBool,omitempty" bson:"pointerBool,omitempty"`
+	PointerInt      *int               `json:"pointerInt,omitempty" bson:"pointerInt,omitempty"`
 	AgeInt          int                `json:"ageInt,omitempty" bson:"ageInt,omitempty"`
 	AgeInt8         int8               `json:"ageInt8,omitempty" bson:"ageInt8,omitempty"`
 	AgeInt16        int16              `json:"ageInt16,omitempty" bson:"ageInt16,omitempty"`

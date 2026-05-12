@@ -114,18 +114,10 @@ func main() {
 		},
 		"personResource": {
 			"name": "Alice",
-			"age": null
+			"ageInt": 30
 		}
 	}`)
 
-	// var out map[string]any
-	// err := json.Unmarshal(bJSON, &out)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// slog.Info("unmarshaled JSON", "output", out)
-
-	// TODO: Make null do unset actions
 	update, err := v2.ParsePatch[models.Resource](bJSON)
 	if err != nil {
 		panic(err)

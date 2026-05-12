@@ -24,15 +24,15 @@ func TestParsePatch(t *testing.T) {
 			name: "simple patch with set and unset",
 			patchJSON: `{
 				"id": "123",
-			"carResource": {
-				"id": "car123",
-				"make": "Toyota",
-				"model": "Corolla"
-			},
-			"personResource": {
-				"name": "Alice",
-				"age": null
-			}
+				"carResource": {
+					"id": "car123",
+					"make": "Toyota",
+					"model": "Corolla"
+				},
+				"personResource": {
+					"name": "Alice",
+					"age": null
+				}
 			
 			}`,
 			Expected: v1.MongoUpdate{
@@ -51,6 +51,186 @@ func TestParsePatch(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "patch with null top-level field",
+			patchJSON: `{
+				"id": "123",
+				"carResource": null,
+				"personResource": {
+					"name": "Alice",
+					"ageInt": 30
+				}
+			}`,
+			Expected: v1.MongoUpdate{
+				Set: bson.M{
+					"id":                    "123",
+					"personResource.name":   "Alice",
+					"personResource.ageInt": 30,
+				},
+				Unset: bson.M{
+					"carResource": "",
+				},
+				Push: bson.M{},
+				Pull: bson.M{},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid value type (string instead of int)",
+			patchJSON: `{
+				"id": "123",
+				"carResource": {
+					"id": "car123",
+					"make": "Toyota",
+					"model": "Corolla"
+				},
+				"personResource": {
+					"name": "Alice",
+					"ageInt": "thirty"
+				}
+			}`,
+			wantErr:     true,
+			errContains: "failed to convert value for field 'personResource.ageInt'",
+		},
+		{
+			name: "invalid json syntax",
+			patchJSON: `{
+				"id": "123",
+				"carResource": {
+					"id": "car123",
+					"make": "Toyota",
+					"model": "Corolla"
+				},
+				"personResource": {
+					"name": "Alice",
+					"ageInt": 30,
+				}
+			`, // missing closing brace and extra comma
+			wantErr:     true,
+			errContains: "failed to unmarshal patch JSON",
+		},
+		{
+			name:      "empty patch",
+			patchJSON: `{}`,
+			Expected: v1.MongoUpdate{
+				Set:   bson.M{},
+				Unset: bson.M{},
+				Push:  bson.M{},
+				Pull:  bson.M{},
+			},
+			wantErr: false,
+		},
+		{
+			name: "null value on non-pointer field",
+			patchJSON: `{
+				"id": "123",
+				"carResource": {
+					"id": "car123",
+					"make": "Toyota",
+					"model": "Corolla"
+				},
+				"personResource": {
+					"name": null,
+					"ageInt": 30
+				}
+			}`,
+			Expected: v1.MongoUpdate{
+				Set: bson.M{
+					"id":                    "123",
+					"carResource.id":        "car123",
+					"carResource.make":      "Toyota",
+					"carResource.model":     "Corolla",
+					"personResource.ageInt": 30,
+				},
+				Unset: bson.M{
+					"personResource.name": "",
+				},
+				Push: bson.M{},
+				Pull: bson.M{},
+			},
+			wantErr: false,
+		},
+		// {
+		// 	name: "mismatched fields in JSON (extra fields)",
+		// 	patchJSON: `{
+		// 		"id": "123",
+		// 		"carResource": {
+		// 			"id": "car123",
+		// 			"make": "Toyota",
+		// 			"model": "Corolla",
+		// 			"color": "red"
+		// 		},
+		// 		"personResource": {
+		// 			"name": "Alice",
+		// 			"ageInt": 30,
+		// 			"hobby": "painting"
+		// 		}
+		// 	}`,
+		// 	wantErr:     true,                                   // extra fields should be ignored, not cause an error
+		// 	errContains: "unknown field 'color' in carResource", // if you want to check for specific error message
+		// },
+		{
+			name: "struct in value field (invalid)",
+			patchJSON: `{
+				"id": "123",
+				"carResource": {
+					"id": "car123",
+					"make": "Toyota",
+					"model": "Corolla"
+				},
+				"personResource": {
+					"name": {"first": "Alice", "last": "Smith"},
+					"ageInt": 30
+				}
+			}`,
+			wantErr:     true,
+			errContains: "failed to convert value for field 'personResource.name'",
+		},
+		{
+			name: "test types conversion",
+			patchJSON: `{
+				"personResource": {
+					"name": "Alice",
+					"ageInt": 30,
+					"ageInt8": 30,
+					"ageInt16": 30,
+					"ageInt32": 30,
+					"ageInt64": 30
+				}
+			}`,
+			// patchJSON: `{
+			// 	"personResource": {
+			// 		"name": "Alice",
+			// 		"pointerString": "pointer value",
+			// 		"pointerInt": 42,
+			// 		"ageInt": 30,
+			// 		"ageInt8": 30,
+			// 		"ageInt16": 30,
+			// 		"ageInt32": 30,
+			// 		"ageInt64": 30
+			// 	}
+			// }`,
+			wantErr: false,
+			Expected: v1.MongoUpdate{
+				Set: bson.M{
+					"personResource.name":     "Alice",
+					"personResource.ageInt":   30,
+					"personResource.ageInt8":  int8(30),
+					"personResource.ageInt16": int16(30),
+					"personResource.ageInt32": int32(30),
+					"personResource.ageInt64": int64(30),
+					// "personResource.pointerString": "pointer value",
+					// "personResource.pointerInt":    42,
+				},
+				Unset: bson.M{},
+				Push:  bson.M{},
+				Pull:  bson.M{},
+			},
+		},
+		// TODO: add test for:
+		// - Pointer string
+		// - Pointer int
+		// - Fail with invalid field path (e.g. "carResource.invalidField": "value")
 	}
 
 	for _, tc := range cases {

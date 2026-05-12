@@ -24,22 +24,11 @@ func WalkStruct(path map[string]any, str any) ([]*FieldInfo, error) {
 		rtype = rtype.Elem()
 	}
 
-	output := make([]*FieldInfo, 0)
+	return traversePath(path, rtype)
 
-	for k, v := range path {
-		slog.Info("walking path", "path", k, "value", v, "name", rtype.Name())
-		// TODO: Struct handling not good
-		out, err := getFieldPath(k, v, rtype, "", 0)
-		if err != nil {
-			slog.Error("failed to get field path", "path", k, "error", err)
-			continue
-		}
-		output = append(output, out...)
-	}
-	return output, nil
 }
 
-func getFieldPath(k, v any, rtype reflect.Type, mpath string, depth int) ([]*FieldInfo, error) {
+func traversePath(pathmap map[string]any, rtype reflect.Type) ([]*FieldInfo, error) {
 
 	output := make([]*FieldInfo, 0)
 
@@ -47,26 +36,56 @@ func getFieldPath(k, v any, rtype reflect.Type, mpath string, depth int) ([]*Fie
 		rtype = rtype.Elem()
 	}
 
-	slog.Info("getting field path", "key", k, "current_path", mpath, "type", rtype.Name(), "kind", rtype.Kind(), "depth", depth, "fields_count", rtype.NumField())
+	for k, v := range pathmap {
+		out, err := getFieldPath(k, v, rtype, "", 0)
+		if err != nil {
+			slog.Error("failed to get field path for key", "key", k, "error", err)
+			continue
+		}
+		output = append(output, out...)
+	}
+
+	return output, nil
+}
+
+func getFieldPath(k, v any, rtype reflect.Type, mpath string, depth int) ([]*FieldInfo, error) {
+
+	output := make([]*FieldInfo, 0)
+
 	for field := range rtype.Fields() {
 
 		name := getFieldName(field)
-
-		if name == "name" {
-			slog.Info("found Alice", "key", k)
-		}
-
 		if name != k {
 			continue
 		}
 
-		// slog.Info("field status", "field_name", name, "field_type", field.Type.Kind(), "is_pointer", isFieldPointer(field), "is_struct", isStruct(field), "is_inline", isInline(field), "is_base_type", isBaseType(field), "depth", depth)
 		if isFieldPointer(field) {
 			// If the value is nil, we assume the pointer field is being set to nil, so we return the field info with a nil value.
 			if v == nil {
 				addFieldInfo(&output, mpath, field.Type, name, nil)
 				continue
 			}
+			if value, ok := v.(map[string]any); ok {
+				if mpath == "" {
+					mpath += name
+				} else {
+					mpath += "." + name
+				}
+				for mk, mv := range value {
+					if mv != nil {
+						out, err := getFieldPath(mk, mv, field.Type.Elem(), mpath, depth+1)
+						if err != nil {
+							slog.Error("failed to get field path for pointer field", "field_name", name, "error", err)
+							continue
+						}
+						output = append(output, out...)
+					} else {
+						addFieldInfo(&output, mpath+"."+mk, field.Type, name, nil)
+						continue
+					}
+				}
+			}
+
 			out, err := getFieldPath(k, v, field.Type.Elem(), mpath, depth+1)
 			if err != nil {
 				slog.Error("failed to get field path for pointer field", "field_name", name, "error", err)

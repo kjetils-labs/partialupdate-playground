@@ -23,6 +23,10 @@ func ParsePatch[T any](patch []byte) (*v1.MongoUpdate, error) {
 		slog.Error("failed to walk struct for fields", "error", err)
 	}
 
+	for _, field := range fields {
+		slog.Info("field info", "path", field.Path, "name", field.Name, "type", field.ReflectionType.String(), "value", field.Value)
+	}
+
 	output := v1.NewMongoUpdate()
 	for _, field := range fields {
 
@@ -42,8 +46,7 @@ func ParsePatch[T any](patch []byte) (*v1.MongoUpdate, error) {
 	return output, nil
 }
 
-// convertToType attempts to convert a value of any type to a specified target type using reflection.
-// It handles common conversions for numeric types and strings, and falls back to standard Go conversions when possible.
+// convertToType attempts to convert a value of any type to a specified target type using reflection. It handles common conversions for numeric types and strings, and falls back to standard Go conversions when possible.
 func convertToType(val any, target reflect.Type) (any, error) {
 	if target == nil {
 		return nil, fmt.Errorf("target type cannot be nil")

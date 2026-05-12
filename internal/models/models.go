@@ -20,12 +20,14 @@ type CarHorses struct {
 type Person struct {
 	ID              string             `json:"id,omitempty" bson:"id,omitempty"`
 	Name            string             `json:"name,omitempty" bson:"name,omitempty"`
+	PointerString   *string            `json:"pointerString,omitempty" bson:"pointerString,omitempty"`
 	Tags            map[string]string  `json:"tags,omitempty" bson:"tags,omitempty"`
 	StructTags      map[string]Car     `json:"structTags,omitempty" bson:"structTags,omitempty"`
 	PointerTags     map[string]*string `json:"pointerTags,omitempty" bson:"pointerTags,omitempty"`
 	Slice           []string           `json:"slice,omitempty" bson:"slice,omitempty"`
 	PointerSlice    []*string          `json:"pointerSlice,omitempty" bson:"pointerSlice,omitempty"`
 	Alive           bool               `json:"alive,omitempty" bson:"alive,omitempty"`
+	IntPointer      *int               `json:"intPointer,omitempty" bson:"intPointer,omitempty"`
 	AgeInt          int                `json:"ageInt,omitempty" bson:"ageInt,omitempty"`
 	AgeInt8         int8               `json:"ageInt8,omitempty" bson:"ageInt8,omitempty"`
 	AgeInt16        int16              `json:"ageInt16,omitempty" bson:"ageInt16,omitempty"`

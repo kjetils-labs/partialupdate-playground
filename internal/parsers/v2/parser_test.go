@@ -219,6 +219,121 @@ func TestParsePatch(t *testing.T) {
 				Pull:  bson.M{},
 			},
 		},
+		{
+			name: "inline struct fields",
+			patchJSON: `{
+				"personResource": {
+					"name": "Alice",
+					"likesCheesecake": true
+				}
+			}`,
+			wantErr: false,
+			Expected: v1.MongoUpdate{
+				Set: bson.M{
+					"personResource.name":            "Alice",
+					"personResource.likesCheesecake": true,
+				},
+				Unset: bson.M{},
+				Push:  bson.M{},
+				Pull:  bson.M{},
+			},
+		},
+		{
+			name: "slice of things",
+			patchJSON: `{
+			"personResource": {
+				"name": "Alice",
+				"slice": ["tag1", "tag2", "tag3"],
+			    "pointerSlice": ["ptrTag1", "ptrTag2"],
+				"intSlice": [1, 2, 3]
+				}
+			}`,
+			wantErr: false,
+			Expected: v1.MongoUpdate{
+				Set: bson.M{
+					"personResource.name":         "Alice",
+					"personResource.slice":        []any{"tag1", "tag2", "tag3"},
+					"personResource.pointerSlice": []any{"ptrTag1", "ptrTag2"},
+					"personResource.intSlice":     []any{1, 2, 3},
+				},
+				Unset: bson.M{},
+				Push:  bson.M{},
+				Pull:  bson.M{},
+			},
+		},
+		{
+			name: "map of things",
+			patchJSON: `{
+				"personResource": {
+					"name": "Alice",
+					"tags": {
+						"tag1": "value1",
+						"tag2": "value2"
+					},
+					"pointerTags": {
+						"ptrTag1": "ptrValue1",
+						"ptrTag2": "ptrValue2"
+					}
+				}
+			}`,
+			wantErr: false,
+			Expected: v1.MongoUpdate{
+				Set: bson.M{
+					"personResource.name":                "Alice",
+					"personResource.tags.tag1":           "value1",
+					"personResource.tags.tag2":           "value2",
+					"personResource.pointerTags.ptrTag1": "ptrValue1",
+					"personResource.pointerTags.ptrTag2": "ptrValue2",
+				},
+				Unset: bson.M{},
+				Push:  bson.M{},
+				Pull:  bson.M{},
+			},
+		},
+		// {
+		// 	name: "slice of structs",
+		// 	patchJSON: `{
+		// 		"personResource": {
+		// 			"structSlice":
+		// 			[
+		// 				{
+		// 					"model": "Corolla",
+		// 					"horses": {
+		// 						"horses": 0
+		// 					}
+		// 				},
+		// 				{
+		// 					"model": "Civic",
+		// 					"horses": {
+		// 						"horses": 0
+		// 					}
+		// 				}
+		// 			]
+		// 		}
+		// 	}`,
+		// 	wantErr: false,
+		// 	Expected: v1.MongoUpdate{
+		// 		Set: bson.M{
+		// 			"personResource.sliceOfStructs": []any{
+		// 				bson.M{
+		// 					"model": "Corolla",
+		// 					"horses": bson.M{
+		// 						"horses": 0,
+		// 					},
+		// 				},
+		// 				bson.M{
+		// 					"model": "Civic",
+		// 					"horses": bson.M{
+		// 						"horses": 0,
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 		Unset: bson.M{},
+		// 		Push:  bson.M{},
+		// 		Pull:  bson.M{},
+		// 	},
+		// },
 	}
 
 	for _, tc := range cases {
